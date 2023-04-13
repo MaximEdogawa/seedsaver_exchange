@@ -9,6 +9,7 @@ INIT ="init "
 DERIVE_ROOT ="derive_root"
 DEFAULT_FILE ="/'Configuration (needs derivation).txt'"
 DEFAULT_FILE_LAUNCH ="/'Configuration (awaiting launch).txt'"
+LAUNCH_SIGNELTON = "launch_singleton "
 
 app = Flask(__name__)
 app.register_blueprint(errors)
@@ -47,16 +48,16 @@ def init():
        
         commandInit = CIC + INIT + " -d " + temp_dir.name + " -wt " + withdraw_timelock + " -pc " + payment_clawback + " -rt " + rekey_timelock + " -rc " + rekey_clawback + " -sp " + slow_rekey_penalty
         commandDerive = CIC + DERIVE_ROOT + " -c " + temp_dir.name + DEFAULT_FILE + " -pks " + "'" + pub_fileNameList + "'" + " -m " + current_lock_level + " -n " + maximum_lock_level
-        commandFileContent = "cat " +temp_dir.name + DEFAULT_FILE_LAUNCH
+        commandLaunchSigelon = CIC + LAUNCH_SIGNELTON + " -c " + temp_dir.name + DEFAULT_FILE_LAUNCH +" --fee 10000000 "
+
         print(commandInit)
         print(commandDerive)
-        print(commandFileContent)
+        print(commandLaunchSigelon)
 
         try:
             proc = subprocess.Popen(commandInit, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
             proc.stdin.close()
-            print(proc.stdout.read())
         except Exception as e:
             print("Error init")
             raise 
@@ -65,11 +66,31 @@ def init():
             proc = subprocess.Popen(commandDerive, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
             proc.stdin.close()
-            print(proc.stdout.read())
         except Exception as e:
             print("Error derive")
             raise 
 
+        try:
+            proc = subprocess.Popen(commandLaunchSigelon, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            proc.wait()
+            proc.stdin.close()
+        except Exception as e:
+            print("Error launch")
+            raise
+        
+        commandGetFileName = "ls " + temp_dir.name
+        print(commandGetFileName)
+        try:
+            proc = subprocess.Popen(commandGetFileName, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            proc.wait()
+            proc.stdin.close()
+            launched_fileName = "/'" + proc.stdout.read().decode("utf-8") + "'"
+        except Exception as e:
+            print("Error launch")
+            raise
+
+        commandFileContent = "cat " + temp_dir.name + launched_fileName
+        print(commandFileContent)
         try:
             proc = subprocess.Popen(commandFileContent, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
@@ -78,7 +99,7 @@ def init():
             datahex=data.hex()
             databytes=bytes.fromhex(datahex)
             if(databytes==data):
-                output = jsonify({"launch_singelton": datahex})
+                output = jsonify({"launched_singelton": datahex})
             else:
                 output = "..."
         except Exception as e:
