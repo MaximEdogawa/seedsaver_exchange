@@ -264,7 +264,7 @@ def complete():
     return output
 
 @app.route("/clawback", methods=["POST"])
-def custom():
+def clawback():
     payload = request.get_json()
     
     if payload.get("clawback_create") is True:
