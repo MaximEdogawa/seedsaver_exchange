@@ -1,3 +1,4 @@
-flask
-gunicorn
-chia-internal-custody
+chia-internal-custody==0.2.2
+click==7.1.2
+flask==2.0.0 
+gunicorn==20.1.0
