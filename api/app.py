@@ -14,7 +14,7 @@ DEFAULT_FILE_LAUNCH ="/'Configuration (awaiting launch).txt'"
 LAUNCH_SIGNELTON = "launch_singleton "
 PAYMENT = "payment "
 PUSH_TX = "push_tx "
-DEFAULT_FEE = "10000000"
+DEFAULT_FEE = "50000"
 COMPLETE = "complete "
 COMPLETE_FILE = "complete.signed"
 CLAWBACK = "clawback "
@@ -300,7 +300,7 @@ def withdrawal():
             f.seek(0)
             pass
 
-        commandWithdrawPush = CIC + PUSH_TX + " -b " + f.name + " -m " + DEFAULT_FEE
+        commandWithdrawPush = CIC + PUSH_TX + "-b " + f.name + " -m " + DEFAULT_FEE
         print(commandWithdrawPush)
         try:
             proc = subprocess.Popen(commandWithdrawPush, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
@@ -355,7 +355,7 @@ def complete():
            print("Error sync")
            raise
     
-       commandComplete = "cd "+ temp_dir.name + " && "+ CIC + COMPLETE + "-f " + temp_dir.name +"/complete.signed"
+       commandComplete = "cd "+ temp_dir.name + " && "+ CIC + COMPLETE + " -f "+ temp_dir.name +"/complete.signed"
        print(commandComplete)
        try:
             proc = subprocess.Popen(commandComplete, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
@@ -367,14 +367,26 @@ def complete():
        except Exception as e:
             print ("Error complete create")
             raise
+       
+       commandFileContent = "cat " + temp_dir.name + "/complete.signed"
+       print(commandFileContent)
+       try:
+           proc = subprocess.Popen(commandFileContent, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+           proc.wait()
+           proc.stdin.close()
+           data=proc.stdout.read().decode("utf-8")
+           print(data) 
+       except Exception as e:
+           print("Error get Complete")
+           raise
 
-       commandCompletePush = "cd "+ temp_dir.name + " && " + CIC + PUSH_TX + " -b "+temp_dir.name+"/complete.signed" + " -m " + DEFAULT_FEE
+       commandCompletePush = CIC + PUSH_TX + "-b "+ temp_dir.name +"/complete.signed" + " -m " + DEFAULT_FEE
        print(commandCompletePush)
        try:
-            proc = subprocess.Popen(commandComplete, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            proc = subprocess.Popen(commandCompletePush, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
             proc.stdin.close()
-            output = jsonify({"message": "Completed!"})
+            output = proc.stdout.read().decode('utf-8')
        except Exception as e:
             print ("Error complete create")
             output = jsonify({"message": "..."})
@@ -431,7 +443,7 @@ def clawback():
         file.write(clawback_signed)
         file.seek(0)
 
-        commandClawbackPush = CIC + PUSH_TX + " -b " + temp_dir.name + "/" + file.name + " -m " + DEFAULT_FEE
+        commandClawbackPush = CIC + PUSH_TX + "-b " + temp_dir.name + "/" + file.name + " -m " + DEFAULT_FEE
         print(commandClawbackPush)
         try:
             proc = subprocess.Popen(commandClawbackPush, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
