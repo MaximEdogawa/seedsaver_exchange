@@ -402,58 +402,105 @@ def clawback():
     payload = request.get_json()
     
     if payload.get("clawback_create") is True:
-        clawback_unsigned=payload.get("clawback_unsigned")
-        pubkeys_strings = payload.get("pubkeys_strings")
-
         temp_dir = tempfile.TemporaryDirectory()
-        tempFile = tempfile.NamedTemporaryFile('w+t',suffix='.unsigned', dir=temp_dir.name)
-        tempFile.write(clawback_unsigned)
-        tempFile.seek(0)
+        data=payload.get("launched_singelton_hex")
+        id=payload.get("id")
+        pubkeys_strings = payload.get("pubkeys_strings")
+        payment_index= payload.get("payment_index")
+        bytes_data = bytes.fromhex(data)
 
-        # Create temp file list
+        with open(os.path.join(temp_dir.name, id + '.txt'), 'wb') as configure_file:
+                configure_file.write(bytes_data)
+                configure_file.seek(0)
+                pass
+        
         files = []
         pub_fileNameList=""
         for i in range(len(pubkeys_strings)):
-            f = tempfile.NamedTemporaryFile('w+t',suffix=str(i+1)+'.pk', dir=temp_dir.name)
-            f.write(pubkeys_strings[i])
-            f.seek(0)
-            files.append(f)
-            if((i+1)<len(pubkeys_strings)):
-                pub_fileNameList+=(f.name)+","
-            else:
-                pub_fileNameList+=(f.name)
+            with open(os.path.join(temp_dir.name, str(i+1)+'.pk'), 'w') as f:
+                print("Create files:"+str(i+1))
+                f.write(pubkeys_strings[i])
+                f.seek(0)
+                files.append(f)
+                if((i+1)<len(pubkeys_strings)):
+                    pub_fileNameList+=f.name + ","
+                else:
+                    pub_fileNameList+=f.name
+                pass
 
-        commandClawback = CIC + CLAWBACK + " -f " + temp_dir +"/"+tempFile.name +" -pks " + pub_fileNameList
+        commandStatus = CIC + "sync -c "+ configure_file.name +" -db " + temp_dir.name
+        print(commandStatus)
+        try:
+                proc = subprocess.Popen(commandStatus, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+                proc.wait()
+                proc.stdin.close()
+                print("Success sync create")
+        except:
+            print("Error sync")
+            raise
+        
+        commandSync = "cd "+ temp_dir.name + " && "+ CIC + "sync -s "
+        print(commandSync)
+        try:
+                proc = subprocess.Popen(commandSync, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+                proc.wait()
+                proc.stdin.close()
+                print("Success sync")
+        except:
+            print("Error sync")
+            raise
+
+        commandClawback = "cd "+ temp_dir.name +" && "+ CIC + CLAWBACK + " -f " + temp_dir.name +"/clawback.unsigned -pks " + pub_fileNameList
         try:
             proc = subprocess.Popen(commandClawback, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-            proc.wait()
+            input_bytes = payment_index.encode('utf-8') + b'\n'
+            proc.stdin.write(input_bytes)
             proc.stdin.close()
+            output = proc.stdout.read().decode('utf-8')
+            print(output)
+
         except Exception as e:
             print ("Error clawback create")
             raise
 
+        if output == "No actions outstanding\n": 
+            output = jsonify({"clawback_unsigned": output})
+
+        else:
+            commandFileContent = "cat " + temp_dir.name + "/clawback.unsigned"
+            print(commandFileContent)
+            proc = subprocess.Popen(commandFileContent, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            proc.wait()
+            proc.stdin.close()
+            data=proc.stdout.read().decode("utf-8")
+            output = jsonify({"clawback_unsigned": data})     
+
         list(map(lambda f: f.close(), files))
-        tempFile.close()
         temp_dir.cleanup()  
 
     elif payload.get("clawback_push") is True:
         temp_dir = tempfile.TemporaryDirectory()
         clawback_signed = payload.get("clawback_signed")
-        file = tempfile.NamedTemporaryFile('w+t',suffix='.signed', dir=temp_dir.name)
-        file.write(clawback_signed)
-        file.seek(0)
+        payment_index= payload.get("payment_index")
+        bytes_data = bytes.fromhex(clawback_signed)
 
-        commandClawbackPush = CIC + PUSH_TX + "-b " + temp_dir.name + "/" + file.name + " -m " + DEFAULT_FEE
+        with open(os.path.join(temp_dir.name, 'clawback.signed'), 'wb') as f:
+            f.write(bytes_data)
+            f.seek(0)
+            pass
+
+        commandClawbackPush = CIC + PUSH_TX + "-b " + f.name + " -m " + DEFAULT_FEE
         print(commandClawbackPush)
         try:
             proc = subprocess.Popen(commandClawbackPush, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-            proc.wait()
+            input_bytes = payment_index.encode('utf-8') + b'\n'
+            proc.stdin.write(input_bytes)
             proc.stdin.close()
+            output = jsonify({"message": proc.stdout.read().decode('utf-8')})
         except Exception as e:
             print("Error clawback push")
             raise
 
-        file.close()
         temp_dir.cleanup()    
     else:
         output = jsonify({"message": "..."})

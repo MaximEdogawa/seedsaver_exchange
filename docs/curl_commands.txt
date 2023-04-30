@@ -1,0 +1,23 @@
+api init:
+curl -X POST 'localhost:8080/init' --data-raw '{"init_singelton": true, "withdraw_timelock": "", "payment_clawback": "", "rekey_timelock": "", "rekey_clawback": "", "slow_rekey_penalty": "", "pubkeys_strings":[""], "current_lock_level":"", "maximum_lock_level":"" }' --header 'Content-Type: application/json'
+
+api status:
+curl -X POST 'localhost:8080/status' --data-raw '{"sync": true, "launched_singelton_hex":"","id":""}' --header 'Content-Type: application/json'
+
+api get address:
+curl -X POST 'localhost:8080/get_address' --data-raw '{"address": true, "launched_singelton_hex":"","id":""}' --header 'Content-Type: application/json'
+
+api withdrawal:
+curl -X POST 'localhost:8080/withdrawal' --data-raw '{"withdrawal_create": true, "launched_singelton_hex":""}' --header 'Content-Type: application/json'
+
+api withdrawal push:
+curl -X POST 'localhost:8080/withdrawal' --data-raw '{"withdrawal_push": true, "withdrawal_signed":""}' --header 'Content-Type: application/json'
+
+api complete:
+curl -X POST 'localhost:8080/complete' --data-raw '{"complete": true, "launched_singelton_hex":"", "id":"","payment_index":""}' --header 'Content-Type: application/json'
+
+api clawback create:
+curl -X POST 'localhost:8080/clawback' --data-raw '{"clawback_create": true, "launched_singelton_hex":"", "id":"","pubkeys_strings":[""],"payment_index":""}' --header 'Content-Type: application/json'
+
+api clawback push:
+curl -X POST 'localhost:8080/clawback' --data-raw '{"clawback_push": true, "clawback_signed":"", "payment_index":""}' --header 'Content-Type: application/json'
