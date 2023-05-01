@@ -21,3 +21,9 @@ curl -X POST 'localhost:8080/clawback' --data-raw '{"clawback_create": true, "la
 
 api clawback push:
 curl -X POST 'localhost:8080/clawback' --data-raw '{"clawback_push": true, "clawback_signed":"", "payment_index":""}' --header 'Content-Type: application/json'
+
+api rekey create:
+curl -X POST 'localhost:8080/rekey' --data-raw '{"rekey_create": true, "launched_singelton_hex":"","id":"13eae9","pubkeys_strings":[""],"new_pubkeys_strings":[""], "current_lock_level":"", "maximum_lock_level":""}' --header 'Content-Type: application/json'
+
+api rekey push:
+curl -X POST 'localhost:8080/rekey' --data-raw '{"rekey_push": true, "rekey_signed":""}' --header 'Content-Type: application/json'

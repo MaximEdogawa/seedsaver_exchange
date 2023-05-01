@@ -18,6 +18,7 @@ DEFAULT_FEE = "50000"
 COMPLETE = "complete "
 COMPLETE_FILE = "complete.signed"
 CLAWBACK = "clawback "
+START_REKEY = "start_rekey "
 
 app = Flask(__name__)
 app.register_blueprint(errors)
@@ -507,13 +508,137 @@ def clawback():
 
     return output
 
-@app.route("/spendbundle", methods=["POST"])
-def custom():
+@app.route("/rekey", methods=["POST"])
+def rekey():
     payload = request.get_json()
 
-    if payload.get("generate_spendbundle") is True:
-        data=payload.get("pubkeys_strings")
-        output = jsonify({"message": data[0] })
+    if payload.get("rekey_create") is True:
+        data=payload.get("launched_singelton_hex")
+        id=payload.get("id")
+        bytes_data = bytes.fromhex(data)
+        temp_dir = tempfile.TemporaryDirectory()
+        new_pubkeys_strings = payload.get("new_pubkeys_strings")
+        pubkeys_strings = payload.get("pubkeys_strings")
+        current_lock_level = payload.get("current_lock_level")
+        maximum_lock_level = payload.get("maximum_lock_level")
+
+        with open(os.path.join(temp_dir.name, id+'.txt'), 'wb') as temp_file:
+            temp_file.write(bytes_data)
+            temp_file.seek(0)
+            pass
+        
+        commandStatus = CIC + "sync -c "+ temp_file.name +" -db " + temp_dir.name
+        print(commandStatus)
+        try:
+            proc = subprocess.Popen(commandStatus, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            proc.wait()
+            proc.stdin.close()
+        except Exception as e:
+            print("Error status")
+            raise
+
+        files = []
+        pub_fileNameList=""
+        for i in range(len(pubkeys_strings)):
+            with open(os.path.join(temp_dir.name, str(i+1)+'.pk'), 'w') as f:
+                f.write(pubkeys_strings[i])
+                f.seek(0)
+                files.append(f)
+                if((i+1)<len(pubkeys_strings)):
+                    pub_fileNameList+=f.name + ","
+                else:
+                    pub_fileNameList+=f.name
+                pass\
+                
+        new_files = []
+        new_pub_fileNameList=""
+        for i in range(len(new_pubkeys_strings)):
+            with open(os.path.join(temp_dir.name, str(i+1)+'_new.pk'), 'w') as new_f:
+                new_f.write(new_pubkeys_strings[i])
+                new_f.seek(0)
+                new_files.append(f)
+                if((i+1)<len(new_pubkeys_strings)):
+                    new_pub_fileNameList+=new_f.name + ","
+                else:
+                    new_pub_fileNameList+=new_f.name
+                pass
+
+        commandDeriveRoot = "cd "+temp_dir.name+" && "+CIC + DERIVE_ROOT + " -db  " + temp_dir.name +"/'sync ("+id+").sqlite'"+ " -c "+temp_dir.name+"/'Configuration (after rekey).txt'" + " -pks " + "'" + new_pub_fileNameList + "'" + " -m "+current_lock_level+ " -n "+ maximum_lock_level
+        print(commandDeriveRoot)
+        try:
+            proc = subprocess.Popen(commandDeriveRoot, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            proc.wait()
+            proc.stdin.close()
+        except Exception as e:
+            print("Error Derive Root rekey")
+            raise
+
+        commandStartRekey ="cd "+temp_dir.name+" && "+ CIC + START_REKEY +" -f "+ temp_dir.name +"/rekey.unsigned" + " -pks " + "'" + pub_fileNameList + "'" +" -new "+temp_dir.name+"/'Configuration (after rekey).txt'"
+        print(commandStartRekey)
+        try:
+            proc = subprocess.Popen(commandStartRekey, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            proc.wait()
+            proc.stdin.close()
+            print(proc.stdout.read().decode("utf-8"))
+        except Exception as e:
+            output = "..."
+            print("Error rekey unsigned")
+            raise
+
+        commandGetRekeyContent = "cat " + temp_dir.name + "/rekey.unsigned"
+        print(commandGetRekeyContent)
+        try:
+            proc = subprocess.Popen(commandGetRekeyContent, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            proc.wait()
+            proc.stdin.close()
+            rekey_data=proc.stdout.read().decode("utf-8")
+        except Exception as e:
+            rekey_data = "..."
+            print("Error withdrawal unsigned")
+            raise
+
+        commandGetNewConfigContent = "cat " + temp_dir.name + "/'Configuration (after rekey).txt'"
+        print( commandGetNewConfigContent)
+        try:
+            proc = subprocess.Popen( commandGetNewConfigContent, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            proc.wait()
+            proc.stdin.close()
+            config_data=proc.stdout.read()
+            config_data_hex=config_data.hex()
+        except Exception as e:
+            config_data = "..."
+            print("Error rekey unsigned")
+            raise
+
+        output=jsonify({"rekey_unsigned": rekey_data, "rekey_singelton_hex": config_data_hex})
+        list(map(lambda f: f.close(), files))
+        f.close()
+        list(map(lambda new_f: new_f.close(), new_files))
+        new_f.close()
+        temp_dir.cleanup()
+    elif payload.get("rekey_push") is True:
+        temp_dir = tempfile.TemporaryDirectory()
+        data = payload.get("rekey_signed")
+        bytes_data = bytes.fromhex(data)
+
+        with open(os.path.join(temp_dir.name, 'rekey.signed'), 'wb') as f:
+            f.write(bytes_data)
+            f.seek(0)
+            pass
+
+        commandRekeyPush = CIC + PUSH_TX + "-b " + f.name + " -m " + DEFAULT_FEE
+        print(commandRekeyPush)
+        try:
+            proc = subprocess.Popen(commandRekeyPush, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            proc.wait()
+            proc.stdin.close()
+            data=proc.stdout.read().decode("utf-8")
+            output = jsonify({"message":  data})
+        except Exception as e:
+            print("Error rekey push")
+            output = jsonify({"message": "..."})
+            raise
+        temp_dir.cleanup()
     else:
         output = jsonify({"message": "..."})
 
