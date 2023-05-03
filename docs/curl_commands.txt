@@ -27,3 +27,6 @@ curl -X POST 'localhost:8080/rekey' --data-raw '{"rekey_create": true, "launched
 
 api rekey push:
 curl -X POST 'localhost:8080/rekey' --data-raw '{"rekey_push": true, "rekey_signed":""}' --header 'Content-Type: application/json'
+
+api locklevel create:
+curl -X POST 'localhost:8080/locklevel' --data-raw '{"locklevel_increase": true, "launched_singelton_hex":""}' --header 'Content-Type: application/json'
