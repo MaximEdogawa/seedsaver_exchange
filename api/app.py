@@ -4,8 +4,7 @@ import subprocess
 import tempfile
 import os
 import re
-
-
+import logging
 CIC ="cic "
 INIT ="init "
 DERIVE_ROOT ="derive_root"
@@ -41,8 +40,7 @@ def init():
         pubkeys_strings= payload.get("pubkeys_strings")
         current_lock_level = payload.get("current_lock_level")
         maximum_lock_level = payload.get("maximum_lock_level")
-        print("create tempfiles")
-        # Create temp file list
+
         files = []
         pub_fileNameList=""
         for i in range(len(pubkeys_strings)):
@@ -56,61 +54,52 @@ def init():
                 else:
                     pub_fileNameList+=f.name
                 pass
-
-        print(temp_dir.name)
            
         commandInit = CIC + INIT + " -d " + temp_dir.name + " -wt " + withdraw_timelock + " -pc " + payment_clawback + " -rt " + rekey_timelock + " -rc " + rekey_clawback + " -sp " + slow_rekey_penalty
-        print(commandInit)
-
         commandDerive = CIC + DERIVE_ROOT + " -c " + temp_dir.name + DEFAULT_FILE + " -pks " + "'" + pub_fileNameList + "'" + " -m " + current_lock_level + " -n " + maximum_lock_level
-        print(commandDerive)
-
         commandLaunchSingelton = CIC + LAUNCH_SIGNELTON + " -c " + temp_dir.name + DEFAULT_FILE_LAUNCH +" --fee " + DEFAULT_FEE
-        print(commandLaunchSingelton)
 
         try:
             proc = subprocess.Popen(commandInit, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
             proc.stdin.close()
-            print("Success init")
+            logging.info("Success init")
         except Exception as e:
-            print("Error init")
+            logging.error("Error init")
             raise 
 
         try:
             proc = subprocess.Popen(commandDerive, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
             proc.stdin.close()
-            print("Success derive")
+            logging.info("Success derive")
         except Exception as e:
-            print("Error derive")
+            logging.error("Error derive")
             raise 
 
         try:
             proc = subprocess.Popen(commandLaunchSingelton, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
             proc.stdin.close()
-            print("Success launch")
+            logging.info("Success launch")
         except Exception as e:
-            print("Error launch")
+            logging.error("Error launch")
             raise
 
         commandGetFileName = "cd "+ temp_dir.name +" && "+ "ls " "*.txt"
-        print(commandGetFileName)
         try:
             proc = subprocess.Popen(commandGetFileName, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
             proc.stdin.close()
             launched_fileName_full =  proc.stdout.read().decode("utf-8")
-            print("Success Get File Name")
+            logging.info("Success Get File Name")
         except Exception as e:
-            print("Error Get File Name")
+            logging.error("Error Get File Name")
             raise
         
         result = extract_string_between_parentheses(launched_fileName_full)
 
         commandFileContent = "cat " + temp_dir.name + "/'Configuration ("+result+").txt'" 
-        print(commandFileContent)
         try:
             proc = subprocess.Popen(commandFileContent, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
@@ -122,10 +111,10 @@ def init():
                 output = jsonify({"launched_singelton_hex": datahex, "id": result})
             else:
                 output = "..."
-            print("Success Get File Content")
+            logging.info("Success Get File Content")
         except Exception as e:
             output = "..."
-            print("Error Get File Content")
+            logging.error("Error Get File Content")
             raise
 
         list(map(lambda f: f.close(), files))
@@ -151,17 +140,15 @@ def status():
             pass
         
         commandStatus = CIC + "sync -c "+ f.name +" -db " + temp_dir.name
-        print(commandStatus)
         try:
             proc = subprocess.Popen(commandStatus, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
             proc.stdin.close()
         except Exception as e:
-            print("Error status")
+            logging.error("Error status")
             raise
 
         commandStatusShow= "cd "+ temp_dir.name+" && cic sync -s" 
-        print(commandStatusShow)
         try:
             proc = subprocess.Popen(commandStatusShow, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
@@ -170,7 +157,7 @@ def status():
             status = status.replace('\n', ' ')
             output=jsonify({"launched_singelton_info": status})
         except Exception as e:
-            print("Error status show")
+            logging.error("Error status show")
             raise
         
         temp_dir.cleanup()
@@ -196,17 +183,15 @@ def get_address():
             pass
         
         commandStatus = CIC + "sync -c "+ f.name +" -db " + temp_dir.name
-        print(commandStatus)
         try:
             proc = subprocess.Popen(commandStatus, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
             proc.stdin.close()
         except Exception as e:
-            print("Error status")
+            logging.error("Error status")
             raise
 
         commandStatusShow= "cd "+ temp_dir.name +" && cic p2_address --prefix txch" 
-        print(commandStatusShow)
         try:
             proc = subprocess.Popen(commandStatusShow, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
@@ -215,7 +200,7 @@ def get_address():
             address=address.replace('\n', '')
             output=jsonify({"vault_address": address })
         except Exception as e:
-            print("Error get address")
+            logging.error("Error get address")
             raise
         
         temp_dir.cleanup()
@@ -243,16 +228,14 @@ def withdrawal():
             pass
         
         commandStatus = CIC + "sync -c "+ temp_file.name +" -db " + temp_dir.name
-        print(commandStatus)
         try:
             proc = subprocess.Popen(commandStatus, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
             proc.stdin.close()
         except Exception as e:
-            print("Error status")
+            logging.error("Error status")
             raise
 
-        # Create temp file list
         files = []
         pub_fileNameList=""
         for i in range(len(pubkeys_strings)):
@@ -268,17 +251,16 @@ def withdrawal():
                 pass
 
         commandWithdraw = CIC + PAYMENT + "-db " + temp_dir.name + " -f "+ temp_dir.name +"/withdrawal.unsigned" + " -pks " + "'" + pub_fileNameList + "'" + " -a " + withdraw_mojos + " -t " + recipient_address +" -ap"
-        print(commandWithdraw)
+        
         try:
             proc = subprocess.Popen(commandWithdraw, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
             proc.stdin.close()
         except Exception as e:
-            print("Error launch")
+            logging.error("Error launch")
             raise
 
         commandFileContent = "cat " + temp_dir.name + "/withdrawal.unsigned"
-        print(commandFileContent)
         try:
             proc = subprocess.Popen(commandFileContent, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
@@ -287,7 +269,7 @@ def withdrawal():
             output = jsonify({"withdrawal_unsigned": data})
         except Exception as e:
             output = "..."
-            print("Error withdrawal unsigned")
+            logging.error("Error withdrawal unsigned")
             raise
         list(map(lambda f: f.close(), files))
         f.close()
@@ -303,14 +285,13 @@ def withdrawal():
             pass
 
         commandWithdrawPush = CIC + PUSH_TX + "-b " + f.name + " -m " + DEFAULT_FEE
-        print(commandWithdrawPush)
         try:
             proc = subprocess.Popen(commandWithdrawPush, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
             proc.stdin.close()
             output = jsonify({"message": "Successfull withdrawal_push"})
         except Exception as e:
-            print("Error withdrawal push")
+            logging.error("Error withdrawal push")
             output = jsonify({"message": "..."})
             raise
         temp_dir.cleanup()
@@ -324,12 +305,10 @@ def complete():
     payload = request.get_json()
 
     if payload.get("complete") is True:
-       
        payment_index= payload.get("payment_index")
        temp_dir = tempfile.TemporaryDirectory()
        data=payload.get("launched_singelton_hex")
        id=payload.get("id")
-
        bytes_data = bytes.fromhex(data)
        
        with open(os.path.join(temp_dir.name, id+'.txt'), 'wb') as f:
@@ -338,58 +317,54 @@ def complete():
             pass
        
        commandStatus = CIC + "sync -c "+ f.name +" -db " + temp_dir.name
-       print(commandStatus)
        try:
             proc = subprocess.Popen(commandStatus, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
             proc.stdin.close()
        except:
-           print("Error sync")
+           logging.error("Error sync")
            raise
        
        commandSync = "cd "+ temp_dir.name + " && "+ CIC + "sync -s "
-       print(commandSync)
        try:
             proc = subprocess.Popen(commandSync, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
             proc.stdin.close()
        except:
-           print("Error sync")
+           logging.error("Error sync")
            raise
     
        commandComplete = "cd "+ temp_dir.name + " && "+ CIC + COMPLETE + " -f "+ temp_dir.name +"/complete.signed"
-       print(commandComplete)
        try:
             proc = subprocess.Popen(commandComplete, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             input_bytes = payment_index.encode('utf-8') + b'\n'
             proc.stdin.write(input_bytes)
             proc.stdin.close()
             output = proc.stdout.read().decode('utf-8')
-            print(output)
+            logging.info(output)
        except Exception as e:
-            print ("Error complete create")
+            logging.error("Error complete create")
             raise
        
        commandFileContent = "cat " + temp_dir.name + "/complete.signed"
-       print(commandFileContent)
        try:
            proc = subprocess.Popen(commandFileContent, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
            proc.wait()
            proc.stdin.close()
            data=proc.stdout.read().decode("utf-8")
+           logging.info(data)
        except Exception as e:
-           print("Error get Complete")
+           logging.error("Error get Complete")
            raise
 
        commandCompletePush = CIC + PUSH_TX + "-b "+ temp_dir.name +"/complete.signed" + " -m " + DEFAULT_FEE
-       print(commandCompletePush)
        try:
             proc = subprocess.Popen(commandCompletePush, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
             proc.stdin.close()
             output = proc.stdout.read().decode('utf-8')
        except Exception as e:
-            print ("Error complete create")
+            logging.error("Error complete create")
             output = jsonify({"message": "..."})
             raise
        temp_dir.cleanup()
@@ -429,26 +404,24 @@ def clawback():
                     pub_fileNameList+=f.name
                 pass
 
-        commandStatus = CIC + "sync -c "+ configure_file.name +" -db " + temp_dir.name
-        print(commandStatus)
+        commandStatus = CIC + "sync -c "+ configure_file.name +" -db " + temp_dir.name 
         try:
                 proc = subprocess.Popen(commandStatus, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
                 proc.wait()
                 proc.stdin.close()
-                print("Success sync create")
+                logging.info("Success sync create")
         except:
-            print("Error sync")
+            logging.error("Error sync")
             raise
         
         commandSync = "cd "+ temp_dir.name + " && "+ CIC + "sync -s "
-        print(commandSync)
         try:
-                proc = subprocess.Popen(commandSync, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-                proc.wait()
-                proc.stdin.close()
-                print("Success sync")
+            proc = subprocess.Popen(commandSync, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            proc.wait()
+            proc.stdin.close()
+            logging.info("Success sync")
         except:
-            print("Error sync")
+            logging.error("Error sync")
             raise
 
         commandClawback = "cd "+ temp_dir.name +" && "+ CIC + CLAWBACK + " -f " + temp_dir.name +"/clawback.unsigned -pks " + pub_fileNameList
@@ -458,15 +431,12 @@ def clawback():
             proc.stdin.write(input_bytes)
             proc.stdin.close()
             output = proc.stdout.read().decode('utf-8')
-            print(output)
-
         except Exception as e:
-            print ("Error clawback create")
+            logging.error("Error clawback create")
             raise
 
         if output == "No actions outstanding\n": 
             output = jsonify({"clawback_unsigned": output})
-
         else:
             commandFileContent = "cat " + temp_dir.name + "/clawback.unsigned"
             print(commandFileContent)
@@ -491,7 +461,6 @@ def clawback():
             pass
 
         commandClawbackPush = CIC + PUSH_TX + "-b " + f.name + " -m " + DEFAULT_FEE
-        print(commandClawbackPush)
         try:
             proc = subprocess.Popen(commandClawbackPush, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             input_bytes = payment_index.encode('utf-8') + b'\n'
@@ -499,7 +468,7 @@ def clawback():
             proc.stdin.close()
             output = jsonify({"message": proc.stdout.read().decode('utf-8')})
         except Exception as e:
-            print("Error clawback push")
+            logging.error("Error clawback push")
             raise
 
         temp_dir.cleanup()    
@@ -528,13 +497,12 @@ def rekey():
             pass
         
         commandStatus = CIC + "sync -c "+ temp_file.name +" -db " + temp_dir.name
-        print(commandStatus)
         try:
             proc = subprocess.Popen(commandStatus, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
             proc.stdin.close()
         except Exception as e:
-            print("Error status")
+            logging.error("Error status")
             raise
 
         files = []
@@ -564,29 +532,26 @@ def rekey():
                 pass
 
         commandDeriveRoot = "cd "+temp_dir.name+" && "+CIC + DERIVE_ROOT + " -db  " + temp_dir.name +"/'sync ("+id+").sqlite'"+ " -c "+temp_dir.name+"/'Configuration (after rekey).txt'" + " -pks " + "'" + new_pub_fileNameList + "'" + " -m "+current_lock_level+ " -n "+ maximum_lock_level
-        print(commandDeriveRoot)
         try:
             proc = subprocess.Popen(commandDeriveRoot, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
             proc.stdin.close()
         except Exception as e:
-            print("Error Derive Root rekey")
+            logging.error("Error Derive Root rekey")
             raise
 
-        commandStartRekey ="cd "+temp_dir.name+" && "+ CIC + START_REKEY +" -f "+ temp_dir.name +"/rekey.unsigned" + " -pks " + "'" + pub_fileNameList + "'" +" -new "+temp_dir.name+"/'Configuration (after rekey).txt'"
-        print(commandStartRekey)
+        commandStartRekey ="cd "+temp_dir.name+" && "+ CIC + START_REKEY +" -f "+ temp_dir.name +"/rekey.unsigned" + " -pks " + "'" + pub_fileNameList + "'" +" -new "+temp_dir.name+"/'Configuration (after rekey).txt'"  
         try:
             proc = subprocess.Popen(commandStartRekey, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
             proc.stdin.close()
-            print(proc.stdout.read().decode("utf-8"))
+            logging.info(proc.stdout.read().decode("utf-8"))
         except Exception as e:
             output = "..."
-            print("Error rekey unsigned")
+            logging.error("Error rekey unsigned")
             raise
 
         commandGetRekeyContent = "cat " + temp_dir.name + "/rekey.unsigned"
-        print(commandGetRekeyContent)
         try:
             proc = subprocess.Popen(commandGetRekeyContent, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
@@ -594,11 +559,10 @@ def rekey():
             rekey_data=proc.stdout.read().decode("utf-8")
         except Exception as e:
             rekey_data = "..."
-            print("Error withdrawal unsigned")
+            logging.error("Error withdrawal unsigned")
             raise
 
         commandGetNewConfigContent = "cat " + temp_dir.name + "/'Configuration (after rekey).txt'"
-        print( commandGetNewConfigContent)
         try:
             proc = subprocess.Popen( commandGetNewConfigContent, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
@@ -607,7 +571,7 @@ def rekey():
             config_data_hex=config_data.hex()
         except Exception as e:
             config_data = "..."
-            print("Error rekey unsigned")
+            logging.error("Error rekey unsigned")
             raise
 
         output=jsonify({"rekey_unsigned": rekey_data, "rekey_singelton_hex": config_data_hex})
@@ -627,7 +591,6 @@ def rekey():
             pass
 
         commandRekeyPush = CIC + PUSH_TX + "-b " + f.name + " -m " + DEFAULT_FEE
-        print(commandRekeyPush)
         try:
             proc = subprocess.Popen(commandRekeyPush, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
@@ -635,7 +598,7 @@ def rekey():
             data=proc.stdout.read().decode("utf-8")
             output = jsonify({"message":  data})
         except Exception as e:
-            print("Error rekey push")
+            logging.error("Error rekey push")
             output = jsonify({"message": "..."})
             raise
         temp_dir.cleanup()
@@ -650,7 +613,6 @@ def update():
 
     if payload.get("update_config") is True:
         data=payload.get("launched_singelton_hex")
-        id=payload.get("id")
         bytes_data = bytes.fromhex(data)
         temp_dir = tempfile.TemporaryDirectory()
 
@@ -660,37 +622,33 @@ def update():
             pass
 
         commandStatus = CIC + "sync -c "+temp_dir.name+"/'Configuration (after rekey).txt' -db " + temp_dir.name
-        print(commandStatus)
         try:
             proc = subprocess.Popen(commandStatus, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
             proc.stdin.close()
         except:
-           print("Error sync")
+           logging.error("Error sync")
            raise
 
         commandShow = "cd "+temp_dir.name+" && "+CIC + " show -d"
-        print(commandShow)
         try:
             proc = subprocess.Popen(commandShow, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
             proc.stdin.close()
         except Exception as e:
-            print("Error show")
+            logging.error("Error show")
             raise
 
         commandUpdate ="cd "+temp_dir.name+" && "+"cic update_config -c './Configuration (after rekey).txt'"
-        print(commandShow)
         try:
             proc = subprocess.Popen(commandUpdate, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
             proc.stdin.close()
         except Exception as e:
-            print("Error update")
+            logging.error("Error update")
             raise
 
         commandShow = "cd "+temp_dir.name+" && "+CIC + " show -d"
-        print(commandShow)
         try:
             proc = subprocess.Popen(commandShow, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
@@ -698,7 +656,7 @@ def update():
             data=proc.stdout.read().decode("utf-8")
             output = jsonify({"message": data})
         except Exception as e:
-            print("Error show")
+            logging.error("Error show")
             output = jsonify({"message": "..."})
             raise
 
@@ -737,60 +695,54 @@ def locklevel():
                 pass
 
         commandStatus = CIC + "sync -c "+temp_dir.name+"/'Configuration (after rekey).txt' -db " + temp_dir.name
-        print(commandStatus)
         try:
             proc = subprocess.Popen(commandStatus, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
             proc.stdin.close()
         except:
-           print("Error sync")
+           logging.error("Error sync")
            raise
 
         commandShow = "cd "+temp_dir.name+" && "+CIC + " show -d"
-        print(commandShow)
         try:
             proc = subprocess.Popen(commandShow, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
             proc.stdin.close()
         except Exception as e:
-            print("Error show")
+            logging.error("Error show")
             raise
 
         commandUpdate ="cd "+temp_dir.name+" && "+"cic update_config -c './Configuration (after rekey).txt'"
-        print(commandUpdate)
         try:
             proc = subprocess.Popen(commandUpdate, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
             proc.stdin.close()
         except Exception as e:
-            print("Error update")
+            logging.error("Error update")
             raise
 
         commandShow = "cd "+temp_dir.name+" && "+ CIC + " show -d"
-        print(commandShow)
         try:
             proc = subprocess.Popen(commandShow, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
             proc.stdin.close()
         except Exception as e:
-            print("Error show")
+            logging.error("Error show")
             output = jsonify({"message": "..."})
             raise
 
         commandIncreaseLockLevel = "cd "+temp_dir.name+" && "+CIC + INCREASE_SECURITTY_LEVEL + " -db  " + temp_dir.name +"/'sync ("+id+").sqlite'" +  " -pks " + "'" + new_pub_fileNameList + "'" + " -f "+temp_dir.name+"/lock.unsigned"
-        print(commandIncreaseLockLevel)
         try:
             proc = subprocess.Popen(commandIncreaseLockLevel, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
             proc.stdin.close()
             data=proc.stdout.read().decode("utf-8")
-            print(data)
+            logging.info(data)
         except Exception as e:
-            print("Error Increase Lock Level")
+            logging.error("Error Increase Lock Level")
             raise
 
         commandFileContent = "cat " + temp_dir.name + "/lock.unsigned"
-        print(commandFileContent)
         try:
             proc = subprocess.Popen(commandFileContent, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
@@ -799,7 +751,7 @@ def locklevel():
             output = jsonify({"lock_unsigned": data})
         except Exception as e:
             output = "..."
-            print("Error lock unsigned")
+            logging.error("Error lock unsigned")
             raise
         list(map(lambda f_new: f_new.close(), new_files))
         new_files.close()
@@ -808,10 +760,6 @@ def locklevel():
         output = jsonify({"message": "..."})
 
     return output
-
-@app.route("/health")
-def health():
-    return Response("OK", status=200)
 
 def extract_string_between_parentheses(string):
     match = re.search(r'\((.*?)\)', string)
