@@ -19,6 +19,7 @@ COMPLETE = "complete "
 COMPLETE_FILE = "complete.signed"
 CLAWBACK = "clawback "
 START_REKEY = "start_rekey "
+INCREASE_SECURITTY_LEVEL =" increase_security_level "
 
 app = Flask(__name__)
 app.register_blueprint(errors)
@@ -376,7 +377,6 @@ def complete():
            proc.wait()
            proc.stdin.close()
            data=proc.stdout.read().decode("utf-8")
-           print(data) 
        except Exception as e:
            print("Error get Complete")
            raise
@@ -644,6 +644,170 @@ def rekey():
 
     return output
 
+@app.route("/update", methods=["POST"])
+def update():
+    payload = request.get_json()
+
+    if payload.get("update_config") is True:
+        data=payload.get("launched_singelton_hex")
+        id=payload.get("id")
+        bytes_data = bytes.fromhex(data)
+        temp_dir = tempfile.TemporaryDirectory()
+
+        with open(os.path.join(temp_dir.name,'Configuration (after rekey).txt'), 'wb') as f_config:
+            f_config.write(bytes_data)
+            f_config.seek(0)
+            pass
+
+        with open(os.path.join(temp_dir.name, id+'.txt'), 'wb') as f:
+            f.write(bytes_data)
+            f.seek(0)
+            pass
+
+        commandStatus = CIC + "sync -c "+ f.name +" -db " + temp_dir.name
+        print(commandStatus)
+        try:
+            proc = subprocess.Popen(commandStatus, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            proc.wait()
+            proc.stdin.close()
+        except:
+           print("Error sync")
+           raise
+
+        commandShow = "cd "+temp_dir.name+" && "+CIC + " show -d"
+        print(commandShow)
+        try:
+            proc = subprocess.Popen(commandShow, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            proc.wait()
+            proc.stdin.close()
+        except Exception as e:
+            print("Error show")
+            raise
+
+        commandUpdate ="cd "+temp_dir.name+" && "+"cic update_config -c './Configuration (after rekey).txt'"
+        print(commandShow)
+        try:
+            proc = subprocess.Popen(commandUpdate, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            proc.wait()
+            proc.stdin.close()
+        except Exception as e:
+            print("Error update")
+            raise
+
+        commandShow = "cd "+temp_dir.name+" && "+CIC + " show -d"
+        print(commandShow)
+        try:
+            proc = subprocess.Popen(commandShow, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            proc.wait()
+            proc.stdin.close()
+            data=proc.stdout.read().decode("utf-8")
+            output = jsonify({"message": data})
+        except Exception as e:
+            print("Error show")
+            output = jsonify({"message": "..."})
+            raise
+
+    else:
+        output = jsonify({"message": "..."})
+
+    return output
+
+@app.route("/locklevel", methods=["POST"])
+def update():
+    payload = request.get_json()
+
+    if payload.get("locklevel_increase") is True:
+        data=payload.get("launched_singelton_hex")
+        id=payload.get("id")
+        bytes_data = bytes.fromhex(data)
+        temp_dir = tempfile.TemporaryDirectory()
+        new_pubkeys_strings = payload.get("new_pubkeys_strings")
+        pubkeys_strings = payload.get("pubkeys_strings")
+
+        with open(os.path.join(temp_dir.name, id+'.txt'), 'wb') as f_config:
+            f_config.write(bytes_data)
+            f_config.seek(0)
+            pass
+
+        files = []
+        pub_fileNameList=""
+        for i in range(len(pubkeys_strings)):
+            with open(os.path.join(temp_dir.name, str(i+1)+'.pk'), 'w') as f_pub:
+                f_pub.write(pubkeys_strings[i])
+                f_pub.seek(0)
+                files.append(f)
+                if((i+1)<len(pubkeys_strings)):
+                    pub_fileNameList+=f_pub.name + ","
+                else:
+                    pub_fileNameList+=f_pub.name
+                pass
+                
+        new_files = []
+        new_pub_fileNameList=""
+        for i in range(len(new_pubkeys_strings)):
+            with open(os.path.join(temp_dir.name, str(i+1)+'_new.pk'), 'w') as f_new:
+                f_new.write(new_pubkeys_strings[i])
+                f_new.seek(0)
+                new_files.append(f)
+                if((i+1)<len(new_pubkeys_strings)):
+                    new_pub_fileNameList+=f_new.name + ","
+                else:
+                    new_pub_fileNameList+=f_new.name
+                pass
+
+        commandStatus = CIC + "sync -c "+ f_config.name +" -db " + temp_dir.name
+        print(commandStatus)
+        try:
+            proc = subprocess.Popen(commandStatus, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            proc.wait()
+            proc.stdin.close()
+        except:
+           print("Error sync")
+           raise
+
+        commandShow = "cd "+temp_dir.name+" && "+CIC + " show -d"
+        print(commandShow)
+        try:
+            proc = subprocess.Popen(commandShow, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            proc.wait()
+            proc.stdin.close()
+        except Exception as e:
+            print("Error show")
+            raise
+
+        commandIncreaseLockLevel = "cd "+temp_dir.name+" && "+CIC + INCREASE_SECURITTY_LEVEL + " -db  " + temp_dir.name +"/'sync ("+id+").sqlite'" +  " -pks " + "'" + new_pub_fileNameList + "'" + " -f "+temp_dir.name+"/lock.unsigned"
+        print(commandIncreaseLockLevel)
+        try:
+            proc = subprocess.Popen(commandIncreaseLockLevel, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            proc.wait()
+            proc.stdin.close()
+            data=proc.stdout.read().decode("utf-8")
+            print(data)
+        except Exception as e:
+            print("Error Increase Lock Level")
+            raise
+
+        commandFileContent = "cat " + temp_dir.name + "/lock.unsigned"
+        print(commandFileContent)
+        try:
+            proc = subprocess.Popen(commandFileContent, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            proc.wait()
+            proc.stdin.close()
+            data=proc.stdout.read().decode("utf-8")
+            output = jsonify({"lock_unsigned": data})
+        except Exception as e:
+            output = "..."
+            print("Error lock unsigned")
+            raise
+        list(map(lambda f_pub: f_pub.close(), files))
+        list(map(lambda f_new: f_new.close(), new_files))
+        files.close()
+        new_files.close()
+        temp_dir.cleanup()  
+    else:
+        output = jsonify({"message": "..."})
+
+    return output
 
 @app.route("/health")
 def health():
