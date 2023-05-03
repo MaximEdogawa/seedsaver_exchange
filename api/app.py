@@ -757,7 +757,7 @@ def locklevel():
             raise
 
         commandUpdate ="cd "+temp_dir.name+" && "+"cic update_config -c './Configuration (after rekey).txt'"
-        print(commandShow)
+        print(commandUpdate)
         try:
             proc = subprocess.Popen(commandUpdate, shell = True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             proc.wait()
