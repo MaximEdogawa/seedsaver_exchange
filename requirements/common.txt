@@ -1,4 +1,4 @@
-chia-internal-custody==0.2.8
-click==8.1.3
-flask==2.0.0 
-gunicorn==20.1.0
+chia-internal-custody
+click
+flask 
+gunicorn
